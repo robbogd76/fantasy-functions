@@ -49,6 +49,8 @@ async function loadPlayers() {
 
   const data = await fetchBootstrap();
 
+  const bulkWriter = db.bulkWriter();
+
   for (const type of data.element_types) {
     positions.set(type.id, type.singular_name_short);
   }
@@ -97,8 +99,16 @@ async function loadPlayers() {
     };
     players.set(element.id, player);
 
-    db.collection("players").doc(player.id).set(player);
+    const docRef = db.collection("players").doc(player.id);
+    bulkWriter.set(docRef, player);
   }
+
+  await bulkWriter.close().then(() => {
+    functions.logger.log("Successfully wrote all players");
+  }).catch((error) => {
+    functions.logger.error("Failed to write players to firestore: " +
+      error.message);
+  });
 
   return {
     teams: teams,
@@ -114,6 +124,8 @@ async function loadMatches(data, goalkeepers) {
 
   const teams = data.teams;
   const players = data.players;
+
+  const bulkWriter = db.bulkWriter();
 
   for (const fixture of fixtures) {
     const match = {
@@ -299,8 +311,16 @@ async function loadMatches(data, goalkeepers) {
       }
     }
 
-    db.collection("matches").doc(match.id).set(match);
+    const docRef = db.collection("matches").doc(match.id);
+    bulkWriter.set(docRef, match);
   }
+
+  await bulkWriter.close().then(() => {
+    functions.logger.log("Successfully wrote all matches");
+  }).catch((error) => {
+    functions.logger.error("Failed to write players to firestore: " +
+      error.message);
+  });
 
   return fixtures.length;
 }
@@ -319,15 +339,23 @@ async function loadFantasyData() {
 
 exports.scheduledLoadFantasyData = onSchedule(
     "every day 00:00", async (_eventIgnored) => {
-      functions.logger.log("Scheduled load of fantasy data");
-      loadFantasyData();
+      try {
+        functions.logger.log("Scheduled load of fantasy data");
+        await loadFantasyData();
+      } catch (error) {
+        functions.logger.error(error);
+      }
     });
 
 exports.callLoadFantasyData = functions.https.onCall(
     async (_dataIgnored, _contextIgnored) => {
-      functions.logger.log("Adhoc load of fantasy data");
-      await loadFantasyData();
-      return {
-        message: "Instantiated load of data",
-      };
+      try {
+        functions.logger.log("Adhoc load of fantasy data");
+        await loadFantasyData();
+        return {
+          message: "Instantiated load of data",
+        };
+      } catch (error) {
+        functions.logger.log(error);
+      }
     });
