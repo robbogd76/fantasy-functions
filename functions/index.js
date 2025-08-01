@@ -57,7 +57,21 @@ async function loadPlayers() {
 
   for (const team of data.teams) {
     teams.set(team.id, team.name);
+
+    /* write the team to the teams collection */
+    const teamRef = db.collection("teams").doc(team.id.toString());
+    bulkWriter.set(teamRef, {
+      id: team.id,
+      name: team.name,
+    });
   }
+
+  await bulkWriter.flush().then(() => {
+    functions.logger.log("Successfully wrote all teams");
+  }).catch((error) => {
+    functions.logger.error("Failed to write teams to firestore: " +
+      error.message);
+  });
 
   for (const element of data.elements) {
     let points = (element.goals_scored * 2) +
@@ -66,7 +80,7 @@ async function loadPlayers() {
         (2 * element.penalties_missed) -
         (2 * element.own_goals);
 
-    if (positions[element.element_type] == "GKP") {
+    if (positions.get(element.element_type) == "GKP") {
       points += (element.clean_sheets * 2) +
         (element.penalties_saved * 2);
     }
@@ -165,148 +179,150 @@ async function loadMatches(data, goalkeepers) {
       },
     };
 
-    for (const goal of fixture.stats[0].h) {
-      const goalRecord = {
-        player_last_name: players.get(goal.element).web_name,
-        player_id: goal.element.toString(),
-        value: goal.value,
-      };
-      match.goals.home.push(goalRecord);
-    }
+    if (fixture.stats.length > 0) {
+      for (const goal of fixture.stats[0].h) {
+        const goalRecord = {
+          player_last_name: players.get(goal.element).web_name,
+          player_id: goal.element.toString(),
+          value: goal.value,
+        };
+        match.goals.home.push(goalRecord);
+      }
 
-    for (const goal of fixture.stats[0].a) {
-      const goalRecord = {
-        player_last_name: players.get(goal.element).web_name,
-        player_id: goal.element.toString(),
-        value: goal.value,
-      };
-      match.goals.away.push(goalRecord);
-    }
+      for (const goal of fixture.stats[0].a) {
+        const goalRecord = {
+          player_last_name: players.get(goal.element).web_name,
+          player_id: goal.element.toString(),
+          value: goal.value,
+        };
+        match.goals.away.push(goalRecord);
+      }
 
-    for (const assist of fixture.stats[1].h) {
-      const assistRecord = {
-        player_last_name: players.get(assist.element).web_name,
-        player_id: assist.element.toString(),
-        value: assist.value,
-      };
-      match.assists.home.push(assistRecord);
-    }
+      for (const assist of fixture.stats[1].h) {
+        const assistRecord = {
+          player_last_name: players.get(assist.element).web_name,
+          player_id: assist.element.toString(),
+          value: assist.value,
+        };
+        match.assists.home.push(assistRecord);
+      }
 
-    for (const assist of fixture.stats[1].a) {
-      const assistRecord = {
-        player_last_name: players.get(assist.element).web_name,
-        player_id: assist.element.toString(),
-        value: assist.value,
-      };
-      match.assists.away.push(assistRecord);
-    }
+      for (const assist of fixture.stats[1].a) {
+        const assistRecord = {
+          player_last_name: players.get(assist.element).web_name,
+          player_id: assist.element.toString(),
+          value: assist.value,
+        };
+        match.assists.away.push(assistRecord);
+      }
 
-    for (const ownGoal of fixture.stats[2].h) {
-      const ownGoalRecord = {
-        player_last_name: players.get(ownGoal.element).web_name,
-        player_id: ownGoal.element.toString(),
-        value: ownGoal.value,
-      };
-      match.own_goals.home.push(ownGoalRecord);
-    }
+      for (const ownGoal of fixture.stats[2].h) {
+        const ownGoalRecord = {
+          player_last_name: players.get(ownGoal.element).web_name,
+          player_id: ownGoal.element.toString(),
+          value: ownGoal.value,
+        };
+        match.own_goals.home.push(ownGoalRecord);
+      }
 
-    for (const ownGoal of fixture.stats[2].a) {
-      const ownGoalRecord = {
-        player_last_name: players.get(ownGoal.element).web_name,
-        player_id: ownGoal.element.toString(),
-        value: ownGoal.value,
-      };
-      match.own_goals.away.push(ownGoalRecord);
-    }
+      for (const ownGoal of fixture.stats[2].a) {
+        const ownGoalRecord = {
+          player_last_name: players.get(ownGoal.element).web_name,
+          player_id: ownGoal.element.toString(),
+          value: ownGoal.value,
+        };
+        match.own_goals.away.push(ownGoalRecord);
+      }
 
-    match.own_goal_count = match.own_goals.home.length +
-        match.own_goals.away.length;
+      match.own_goal_count = match.own_goals.home.length +
+          match.own_goals.away.length;
 
-    for (const savedPenalty of fixture.stats[3].h) {
-      const savedPenaltyRecord = {
-        player_last_name: players.get(savedPenalty.element).web_name,
-        player_id: savedPenalty.element.toString(),
-        value: savedPenalty.value,
-      };
-      match.penalty_saves.home.push(savedPenaltyRecord);
-    }
+      for (const savedPenalty of fixture.stats[3].h) {
+        const savedPenaltyRecord = {
+          player_last_name: players.get(savedPenalty.element).web_name,
+          player_id: savedPenalty.element.toString(),
+          value: savedPenalty.value,
+        };
+        match.penalty_saves.home.push(savedPenaltyRecord);
+      }
 
-    for (const savedPenalty of fixture.stats[3].a) {
-      const savedPenaltyRecord = {
-        player_last_name: players.get(savedPenalty.element).web_name,
-        player_id: savedPenalty.element.toString(),
-        value: savedPenalty.value,
-      };
-      match.penalty_saves.away.push(savedPenaltyRecord);
-    }
+      for (const savedPenalty of fixture.stats[3].a) {
+        const savedPenaltyRecord = {
+          player_last_name: players.get(savedPenalty.element).web_name,
+          player_id: savedPenalty.element.toString(),
+          value: savedPenalty.value,
+        };
+        match.penalty_saves.away.push(savedPenaltyRecord);
+      }
 
-    for (const missedPenalty of fixture.stats[4].h) {
-      const missedPenaltyRecord = {
-        player_last_name: players.get(missedPenalty.element).web_name,
-        player_id: missedPenalty.element.toString(),
-        value: missedPenalty.value,
-      };
-      match.penalty_misses.home.push(missedPenaltyRecord);
-    }
+      for (const missedPenalty of fixture.stats[4].h) {
+        const missedPenaltyRecord = {
+          player_last_name: players.get(missedPenalty.element).web_name,
+          player_id: missedPenalty.element.toString(),
+          value: missedPenalty.value,
+        };
+        match.penalty_misses.home.push(missedPenaltyRecord);
+      }
 
-    for (const missedPenalty of fixture.stats[4].a) {
-      const missedPenaltyRecord = {
-        player_last_name: players.get(missedPenalty.element).web_name,
-        player_id: missedPenalty.element.toString(),
-        value: missedPenalty.value,
-      };
-      match.penalty_misses.away.push(missedPenaltyRecord);
-    }
+      for (const missedPenalty of fixture.stats[4].a) {
+        const missedPenaltyRecord = {
+          player_last_name: players.get(missedPenalty.element).web_name,
+          player_id: missedPenalty.element.toString(),
+          value: missedPenalty.value,
+        };
+        match.penalty_misses.away.push(missedPenaltyRecord);
+      }
 
-    for (const redCard of fixture.stats[6].h) {
-      const redCardRecord = {
-        player_last_name: players.get(redCard.element).web_name,
-        player_id: redCard.element.toString(),
-        value: redCard.value,
-      };
-      match.red_cards.home.push(redCardRecord);
-    }
+      for (const redCard of fixture.stats[6].h) {
+        const redCardRecord = {
+          player_last_name: players.get(redCard.element).web_name,
+          player_id: redCard.element.toString(),
+          value: redCard.value,
+        };
+        match.red_cards.home.push(redCardRecord);
+      }
 
-    for (const redCard of fixture.stats[6].a) {
-      const redCardRecord = {
-        player_last_name: players.get(redCard.element).web_name,
-        player_id: redCard.element.toString(),
-        value: redCard.value,
-      };
-      match.red_cards.away.push(redCardRecord);
-    }
+      for (const redCard of fixture.stats[6].a) {
+        const redCardRecord = {
+          player_last_name: players.get(redCard.element).web_name,
+          player_id: redCard.element.toString(),
+          value: redCard.value,
+        };
+        match.red_cards.away.push(redCardRecord);
+      }
 
-    // Clean sheets are harder to find for the match info as
-    // the API for fixtures doesn't return this info.
-    // The player history API does return it.
-    // We have pre loaded the player history for all of the
-    // goalkeepers so we will use that.
-    for (const summary of goalkeepers.get(fixture.team_h)) {
-      for (const history of summary.history) {
-        if (history.fixture == fixture.id &&
-            history.clean_sheets == 1) {
-          const cleanSheet = {
-            player_last_name: players.get(
-                parseInt(summary.id)).web_name,
-            player_id: summary.id,
-            value: 1,
-          };
-          match.clean_sheets.home.push(cleanSheet);
+      // Clean sheets are harder to find for the match info as
+      // the API for fixtures doesn't return this info.
+      // The player history API does return it.
+      // We have pre loaded the player history for all of the
+      // goalkeepers so we will use that.
+      for (const summary of goalkeepers.get(fixture.team_h)) {
+        for (const history of summary.history) {
+          if (history.fixture == fixture.id &&
+              history.clean_sheets == 1) {
+            const cleanSheet = {
+              player_last_name: players.get(
+                  parseInt(summary.id)).web_name,
+              player_id: summary.id,
+              value: 1,
+            };
+            match.clean_sheets.home.push(cleanSheet);
+          }
         }
       }
-    }
 
-    for (const summary of goalkeepers.get(fixture.team_a)) {
-      for (const history of summary.history) {
-        if (history.fixture == fixture.id &&
-            history.clean_sheets == 1) {
-          const cleanSheet = {
-            player_last_name: players.get(
-                parseInt(summary.id)).web_name,
-            player_id: summary.id,
-            value: 1,
-          };
-          match.clean_sheets.away.push(cleanSheet);
+      for (const summary of goalkeepers.get(fixture.team_a)) {
+        for (const history of summary.history) {
+          if (history.fixture == fixture.id &&
+              history.clean_sheets == 1) {
+            const cleanSheet = {
+              player_last_name: players.get(
+                  parseInt(summary.id)).web_name,
+              player_id: summary.id,
+              value: 1,
+            };
+            match.clean_sheets.away.push(cleanSheet);
+          }
         }
       }
     }
