@@ -295,7 +295,7 @@ async function loadMatches(data, goalkeepers) {
       // the API for fixtures doesn't return this info.
       // The player history API does return it.
       // We have pre loaded the player history for all of the
-      // goalkeepers so we will use that.
+      // goalkeepers so we will use that.  Test
       for (const summary of goalkeepers.get(fixture.team_h)) {
         for (const history of summary.history) {
           if (history.fixture == fixture.id &&
